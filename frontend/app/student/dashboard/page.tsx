@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Upload, FileText, CheckCircle, Clock, AlertTriangle, XCircle, Banknote, LayoutDashboard, Wallet, FolderOpen, Settings } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import NotificationCenter from '@/components/NotificationCenter';
-import { api } from '../../../lib/api';
+import { api } from '@/lib/api';
 
 const STATUS_STEPS = [
     { id: 'Pending', label: 'Registered', sublabel: '' },

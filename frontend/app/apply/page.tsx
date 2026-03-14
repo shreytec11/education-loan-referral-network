@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import LeadForm from '../../components/LeadForm';
+import LeadForm from '@/components/LeadForm';
 
 export default function ApplyPage() {
     return (
