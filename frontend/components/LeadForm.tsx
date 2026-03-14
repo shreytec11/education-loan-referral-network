@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '../lib/api';
 
 export default function LeadForm() {
     const searchParams = useSearchParams();

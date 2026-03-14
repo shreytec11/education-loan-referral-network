@@ -5,7 +5,7 @@ import { Copy, Users, DollarSign, Activity, CheckCircle, TrendingUp, LayoutDashb
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import NotificationCenter from '@/components/NotificationCenter';
-import { api } from '@/lib/api';
+import { api } from '../../../../lib/api';
 
 interface DashboardData {
     ambassador: {
