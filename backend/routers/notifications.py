@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
-from ..database import get_session
-from ..models import Notification
+from database import get_session
+from models import Notification
 from uuid import UUID
 
 router = APIRouter(prefix="/api/notifications", tags=["Notifications"])

@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List
-from ..database import get_session
-from ..models import Ambassador, Notification
+from database import get_session
+from models import Ambassador, Notification
 from uuid import UUID
 
 router = APIRouter(prefix="/api/ambassadors", tags=["Ambassadors"])
 
 from pydantic import BaseModel
-from .auth import get_password_hash, require_ambassador_token
+from routers.auth import get_password_hash, require_ambassador_token
 
 class AmbassadorCreate(BaseModel):
     full_name: str

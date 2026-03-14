@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlmodel import Session, select
 from typing import List, Optional
-from ..database import get_session
-from ..models import Lead, Document
+from database import get_session
+from models import Lead, Document
 from uuid import UUID
-from .auth import require_student_token
+from routers.auth import require_student_token
 import shutil
 import os
 from datetime import datetime
@@ -53,7 +53,7 @@ def upload_document(
     session.refresh(doc)
     
     # Notify Admin
-    from ..models import Notification
+    from models import Notification
     admin_notif = Notification(
         recipient_type='admin',
         title='New Document Uploaded',
@@ -99,7 +99,7 @@ def get_lead_status(
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     
-    from ..models import Disbursement
+    from models import Disbursement
     
     result = {
         "id": lead.id,
@@ -141,7 +141,7 @@ def verify_document(document_id: UUID, update: DocumentUpdate, session: Session 
     session.commit()
     
     # Notify Student if rejected or verified
-    from ..models import Notification
+    from models import Notification
     lead = session.get(Lead, doc.lead_id)
     if lead:
         status_msg = "approved ✅" if update.status == "Verified" else "rejected ❌"

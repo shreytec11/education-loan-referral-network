@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 import os
-from .database import create_db_and_tables
-from .routers import ambassadors, leads, analytics, admin, auth, documents, notifications
+from database import create_db_and_tables
+from routers import ambassadors, leads, analytics, admin, auth, documents, notifications
 from contextlib import asynccontextmanager
 
 # Trigger reload (argon2 installed in venv)

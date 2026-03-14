@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
-from ..database import get_session
-from ..models import Lead, Disbursement, Ambassador
-from .auth import require_admin_token, require_ambassador_token
+from database import get_session
+from models import Lead, Disbursement, Ambassador
+from routers.auth import require_admin_token, require_ambassador_token
 from uuid import UUID
 from datetime import datetime
 

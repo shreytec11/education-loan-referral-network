@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
-from ..database import get_session
-from ..models import Lead, Disbursement, Ambassador, SystemSettings
-from .auth import require_admin_token
+from database import get_session
+from models import Lead, Disbursement, Ambassador, SystemSettings
+from routers.auth import require_admin_token
 from uuid import UUID
 from datetime import datetime, timezone
 from typing import List
@@ -126,7 +126,7 @@ def mark_payout_as_paid(disbursement_id: UUID, session: Session = Depends(get_se
     session.refresh(disbursement)
     
     # Notify Ambassador
-    from ..models import Notification, Lead
+    from models import Notification, Lead
     lead = session.get(Lead, disbursement.lead_id)
     if lead and lead.ambassador_id:
         notif = Notification(

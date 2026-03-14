@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
 from pydantic import BaseModel
-from ..database import get_session
-from ..models import Lead, Ambassador, Disbursement, Notification
+from database import get_session
+from models import Lead, Ambassador, Disbursement, Notification
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -72,7 +72,7 @@ def create_lead(lead_data: LeadCreate, session: Session = Depends(get_session)):
 # Commission Calculation
 def calculate_commission(disbursed_amount: float, session: Session) -> dict:
     """Calculate commission breakdown for a disbursed loan using dynamic settings."""
-    from ..models import SystemSettings
+    from models import SystemSettings
     settings = session.get(SystemSettings, 1)
     if not settings:
         settings = SystemSettings(id=1)
