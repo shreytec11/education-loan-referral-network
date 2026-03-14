@@ -36,9 +36,14 @@ function ForgotPasswordForm() {
                 });
             }
             const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.detail || data.message || 'Something went wrong processing your request.');
+            }
+            
             setResult({ ok: true, message: data.message, token: data.reset_token });
-        } catch {
-            setResult({ ok: false, message: 'Something went wrong. Please try again.' });
+        } catch (err: any) {
+            setResult({ ok: false, message: err.message || 'Network error or request timeout. Please try again.' });
         } finally {
             setLoading(false);
         }
@@ -92,6 +97,12 @@ function ForgotPasswordForm() {
                                 <Link href={`/reset-password?token=${result.token}&type=${userType}`} className="btn btn-primary" style={{ display: 'block', textDecoration: 'none', textAlign: 'center' }}>
                                     Reset Password Now →
                                 </Link>
+                            )}
+                            
+                            {!result.ok && (
+                                <button onClick={() => setResult(null)} className="btn btn-secondary" style={{ marginTop: '1rem' }}>
+                                    Try Again
+                                </button>
                             )}
                         </div>
                     )}

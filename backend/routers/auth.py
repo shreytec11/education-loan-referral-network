@@ -9,10 +9,7 @@ from datetime import datetime, timezone, timedelta
 from logging_config import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os, resend
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -21,54 +18,46 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 # ── Rate limiter (shared with main.py) ────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
 
-# ── SMTP Email setup (Gmail) ──────────────────────────────────────
-SMTP_EMAIL    = os.getenv("SMTP_EMAIL", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-FRONTEND_URL  = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")[0].strip()
+# ── Resend email setup ────────────────────────────────────────────
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM    = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+FRONTEND_URL   = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")[0].strip()
 
-if SMTP_EMAIL and SMTP_PASSWORD:
-    logger.info("Gmail SMTP configured")
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
+    logger.info("Resend email configured")
 else:
-    logger.warning("SMTP_EMAIL or SMTP_PASSWORD not set — emails will be skipped (token returned in response)")
+    logger.warning("RESEND_API_KEY not set — emails will be skipped (token returned in response)")
 
 def send_reset_email(to_email: str, token: str, user_type: str):
-    """Send password reset email via Gmail SMTP. Falls back gracefully if not configured."""
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
+    """Send password reset email via Resend API. Falls back gracefully if not configured."""
+    if not RESEND_API_KEY:
         return {"success": False, "reason": "not_configured"}
         
     reset_link = f"{FRONTEND_URL}/reset-password?token={token}&type={user_type}"
     
-    html_content = f"""
-    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:2rem">
-        <h2 style="color:#6366f1">Password Reset Request</h2>
-        <p>We received a request to reset your password. Click the button below to set a new password.</p>
-        <a href="{reset_link}" style="display:inline-block;background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:1rem 0">
-            Reset My Password
-        </a>
-        <p style="color:#666;font-size:0.85rem">This link expires in <strong>1 hour</strong>. If you did not request this, you can safely ignore this email.</p>
-        <hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0"/>
-        <p style="color:#999;font-size:0.75rem">FinConnect — Education Loan Platform</p>
-    </div>
-    """
-    
-    msg = MIMEMultipart()
-    msg['From'] = f"FinConnect <{SMTP_EMAIL}>"
-    msg['To'] = to_email
-    msg['Subject'] = "Reset your FinConnect password"
-    msg.attach(MIMEText(html_content, 'html'))
-
     try:
-        # Connect to Gmail SMTP server
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        
-        logger.info(f"Reset email sent to {to_email} via Gmail for {user_type}")
+        resend.Emails.send({
+            "from": RESEND_FROM,
+            "to": [to_email],
+            "subject": "Reset your FinConnect password",
+            "html": f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:2rem">
+                <h2 style="color:#6366f1">Password Reset Request</h2>
+                <p>We received a request to reset your password. Click the button below to set a new password.</p>
+                <a href="{reset_link}" style="display:inline-block;background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:1rem 0">
+                    Reset My Password
+                </a>
+                <p style="color:#666;font-size:0.85rem">This link expires in <strong>1 hour</strong>. If you did not request this, you can safely ignore this email.</p>
+                <hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0"/>
+                <p style="color:#999;font-size:0.75rem">FinConnect — Education Loan Platform</p>
+            </div>
+            """
+        })
+        logger.info(f"Reset email sent to {to_email} via Resend for {user_type}")
         return {"success": True}
     except Exception as e:
-        logger.error(f"Failed to send reset email via Gmail: {e}")
+        logger.error(f"Failed to send reset email via Resend: {e}")
         return {"success": False, "reason": str(e)}
 
 # ── Schemas ─────────────────────────────────────────────────────
