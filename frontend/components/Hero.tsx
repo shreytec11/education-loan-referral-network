@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 const ROTATING_TEXTS = [
-    "10 easy parts",
     "zero-cost EMIs",
     "flexible payments",
     "transparent installments"
