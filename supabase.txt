@@ -1,5 +1,7 @@
 password: KaHQ_rJdA5f%iCn
 
-postgresql://postgres:KaHQ_rJdA5f%iCn@db.rajjswjvrsvodyypvqmx.supabase.co:5432/postgres
+postgresql://postgres.rajjswjvrsvodyypvqmx:KaHQ_rJdA5f%iCn@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres
 
 render secret key: c842a273a625714c5ff85db6b72d317e
+
+https://education-loan-referral-network.onrender.com/
