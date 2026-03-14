@@ -9,3 +9,8 @@ argon2-cffi==25.1.0
 python-dotenv==1.2.1
 psycopg2-binary==2.9.10
 boto3==1.36.26
+slowapi==0.1.9
+resend==2.10.0
+sentry-sdk[fastapi]==2.23.1
+supabase==2.13.0
+email-validator==2.2.0

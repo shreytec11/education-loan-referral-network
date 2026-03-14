@@ -1,35 +1,118 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from sqlmodel import Session, select
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, EmailStr
 from passlib.context import CryptContext
 from database import get_session
 from models import Ambassador, Admin, Lead, PasswordResetToken
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime, timezone, timedelta
+from logging_config import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+import os, resend
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
+# ── Rate limiter (shared with main.py) ────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+
+# ── Resend email setup ────────────────────────────────────────────
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM    = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+FRONTEND_URL   = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")[0].strip()
+
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
+    logger.info("Resend email configured")
+else:
+    logger.warning("RESEND_API_KEY not set — emails will be skipped (token returned in response)")
+
+def send_reset_email(to_email: str, token: str, user_type: str):
+    """Send password reset email via Resend. Falls back gracefully if not configured."""
+    if not RESEND_API_KEY:
+        return False
+    reset_link = f"{FRONTEND_URL}/reset-password?token={token}&type={user_type}"
+    try:
+        resend.Emails.send({
+            "from": RESEND_FROM,
+            "to": [to_email],
+            "subject": "Reset your FinConnect password",
+            "html": f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:2rem">
+                <h2 style="color:#6366f1">Password Reset Request</h2>
+                <p>We received a request to reset your password. Click the button below to set a new password.</p>
+                <a href="{reset_link}" style="display:inline-block;background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:1rem 0">
+                    Reset My Password
+                </a>
+                <p style="color:#666;font-size:0.85rem">This link expires in <strong>1 hour</strong>. If you did not request this, you can safely ignore this email.</p>
+                <hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0"/>
+                <p style="color:#999;font-size:0.75rem">FinConnect — Education Loan Platform</p>
+            </div>
+            """
+        })
+        logger.info(f"Reset email sent to {to_email} for {user_type}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send reset email: {e}")
+        return False
+
+# ── Schemas ─────────────────────────────────────────────────────
+
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_length(cls, v: str) -> str:
+        if len(v) < 1:
+            raise ValueError("Password cannot be empty")
+        if len(v) > 128:
+            raise ValueError("Password too long")
+        return v
 
 class AdminLoginRequest(BaseModel):
     username: str
     password: str
 
+    @field_validator("username")
+    @classmethod
+    def username_length(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Username cannot be empty")
+        return v.strip()
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def pw_strength(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters")
+        if len(v) > 128:
+            raise ValueError("Password too long")
+        return v
 
 class AdminChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
+    @field_validator("new_password")
+    @classmethod
+    def pw_strength(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters")
+        if len(v) > 128:
+            raise ValueError("Password too long")
+        return v
+
 class ForgotPasswordRequest(BaseModel):
-    email: str  # For ambassador and student
-    user_type: str  # 'ambassador' or 'student'
+    email: EmailStr
+    user_type: Literal["ambassador", "student"]
 
 class AdminForgotPasswordRequest(BaseModel):
     username: str
@@ -38,6 +121,15 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
+    @field_validator("new_password")
+    @classmethod
+    def pw_strength(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters")
+        return v
+
+# ── Helpers ──────────────────────────────────────────────────────
+
 def verify_password(plain_password, hashed_password):
     if not hashed_password: return False
     return pwd_context.verify(plain_password, hashed_password)
@@ -45,8 +137,11 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
+# ── Login Endpoints (rate-limited) ───────────────────────────────
+
 @router.post("/ambassador/login")
-def ambassador_login(data: LoginRequest, session: Session = Depends(get_session)):
+@limiter.limit("10/minute")
+def ambassador_login(request: Request, data: LoginRequest, session: Session = Depends(get_session)):
     statement = select(Ambassador).where(Ambassador.email == data.email)
     ambassador = session.exec(statement).first()
     
@@ -64,7 +159,8 @@ def ambassador_login(data: LoginRequest, session: Session = Depends(get_session)
     }
 
 @router.post("/student/login")
-def student_login(data: LoginRequest, session: Session = Depends(get_session)):
+@limiter.limit("10/minute")
+def student_login(request: Request, data: LoginRequest, session: Session = Depends(get_session)):
     statement = select(Lead).where(Lead.contact_email == data.email)
     lead = session.exec(statement).first()
     
@@ -83,6 +179,7 @@ def student_login(data: LoginRequest, session: Session = Depends(get_session)):
     elif not verify_password(data.password, lead.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
+    logger.info(f"Student login: {lead.contact_email}")
     return {
         "id": lead.id,
         "full_name": lead.student_name,
@@ -91,7 +188,8 @@ def student_login(data: LoginRequest, session: Session = Depends(get_session)):
     }
 
 @router.post("/admin/login")
-def admin_login(data: AdminLoginRequest, session: Session = Depends(get_session)):
+@limiter.limit("10/minute")
+def admin_login(request: Request, data: AdminLoginRequest, session: Session = Depends(get_session)):
     statement = select(Admin).where(Admin.username == data.username)
     admin = session.exec(statement).first()
     
@@ -100,7 +198,8 @@ def admin_login(data: AdminLoginRequest, session: Session = Depends(get_session)
         
     if not verify_password(data.password, admin.password_hash):
         raise HTTPException(status_code=401, detail="Invalid admin credentials")
-        
+    
+    logger.info(f"Admin login: {admin.username}")
     return {"token": str(admin.id), "message": "Login successful"}
 
 def require_admin_token(
@@ -232,23 +331,23 @@ def student_change_password(
 # ─────────────────────────────────────────────────────
 
 @router.post("/forgot-password/request")
-def forgot_password_request(data: ForgotPasswordRequest, session: Session = Depends(get_session)):
-    """Request a password reset token. Token is returned (email simulation for MVP)."""
+@limiter.limit("5/minute")
+def forgot_password_request(request: Request, data: ForgotPasswordRequest, session: Session = Depends(get_session)):
+    """Request a password reset. Sends email via Resend if configured, otherwise returns token (dev mode)."""
     user = None
     user_id = None
+    user_email = str(data.email)
 
     if data.user_type == "ambassador":
-        stmt = select(Ambassador).where(Ambassador.email == data.email)
+        stmt = select(Ambassador).where(Ambassador.email == user_email)
         user = session.exec(stmt).first()
         if user:
             user_id = str(user.id)
     elif data.user_type == "student":
-        stmt = select(Lead).where(Lead.contact_email == data.email)
+        stmt = select(Lead).where(Lead.contact_email == user_email)
         user = session.exec(stmt).first()
         if user:
             user_id = str(user.id)
-    else:
-        raise HTTPException(status_code=400, detail="Invalid user_type. Use 'ambassador' or 'student'.")
 
     # Always return a success message to prevent email enumeration
     if not user:
@@ -275,15 +374,23 @@ def forgot_password_request(data: ForgotPasswordRequest, session: Session = Depe
     session.commit()
     session.refresh(reset_token)
 
-    # In production: send email with link. For MVP: return token directly.
-    return {
-        "message": "Password reset token generated. In production, this would be emailed.",
-        "reset_token": reset_token.token,  # Remove this in production
-        "expires_in": "1 hour"
-    }
+    email_sent = send_reset_email(user_email, reset_token.token, data.user_type)
+
+    if email_sent:
+        logger.info(f"Password reset email sent to {user_email} [{data.user_type}]")
+        return {"message": "Password reset link sent to your email. It expires in 1 hour."}
+    else:
+        # Dev/fallback mode: return token in response
+        logger.warning(f"Email not sent (no Resend key). Returning token for {user_email}")
+        return {
+            "message": "Email not configured. Use the token below (dev mode only).",
+            "reset_token": reset_token.token,
+            "expires_in": "1 hour"
+        }
 
 @router.post("/forgot-password/admin/request")
-def admin_forgot_password_request(data: AdminForgotPasswordRequest, session: Session = Depends(get_session)):
+@limiter.limit("5/minute")
+def admin_forgot_password_request(request: Request, data: AdminForgotPasswordRequest, session: Session = Depends(get_session)):
     """Request a password reset token for admin."""
     stmt = select(Admin).where(Admin.username == data.username)
     admin = session.exec(stmt).first()
@@ -311,8 +418,10 @@ def admin_forgot_password_request(data: AdminForgotPasswordRequest, session: Ses
     session.commit()
     session.refresh(reset_token)
 
+    # Admin has no email stored — always return token
+    # In production, store admin email and send via Resend
     return {
-        "message": "Reset token generated.",
+        "message": "Reset token generated (admin emails coming soon).",
         "reset_token": reset_token.token,
         "expires_in": "1 hour"
     }

@@ -1,21 +1,56 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from database import get_session
 from models import Lead, Ambassador, Disbursement, Notification
 from datetime import datetime, timezone
 from uuid import UUID
+from logging_config import logger
 
 router = APIRouter(prefix="/api/leads", tags=["Leads"])
 
 class LeadCreate(BaseModel):
     student_name: str
-    contact_email: str
+    contact_email: EmailStr
     contact_phone: str
     course_and_university: str
     loan_requirement: float
     referral_code: Optional[str] = None
+
+    @field_validator("student_name")
+    @classmethod
+    def name_check(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name cannot be empty")
+        if len(v) > 120:
+            raise ValueError("Name too long")
+        return v
+
+    @field_validator("contact_phone")
+    @classmethod
+    def phone_check(cls, v: str) -> str:
+        v = v.strip().replace(" ", "").replace("-", "")
+        if len(v) < 10 or len(v) > 15:
+            raise ValueError("Enter a valid phone number (10-15 digits)")
+        return v
+
+    @field_validator("loan_requirement")
+    @classmethod
+    def loan_range(cls, v: float) -> float:
+        if v < 50_000:
+            raise ValueError("Minimum loan requirement is ₹50,000")
+        if v > 5_00_00_000:
+            raise ValueError("Maximum loan requirement is ₹5 Crore")
+        return v
+
+    @field_validator("referral_code")
+    @classmethod
+    def code_check(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and len(v) > 20:
+            raise ValueError("Referral code too long")
+        return v
 
 @router.post("/")
 def create_lead(lead_data: LeadCreate, session: Session = Depends(get_session)):
