@@ -32,7 +32,7 @@ else:
 def send_reset_email(to_email: str, token: str, user_type: str):
     """Send password reset email via Resend. Falls back gracefully if not configured."""
     if not RESEND_API_KEY:
-        return False
+        return {"success": False, "reason": "not_configured"}
     reset_link = f"{FRONTEND_URL}/reset-password?token={token}&type={user_type}"
     try:
         resend.Emails.send({
@@ -53,10 +53,10 @@ def send_reset_email(to_email: str, token: str, user_type: str):
             """
         })
         logger.info(f"Reset email sent to {to_email} for {user_type}")
-        return True
+        return {"success": True}
     except Exception as e:
         logger.error(f"Failed to send reset email: {e}")
-        return False
+        return {"success": False, "reason": str(e)}
 
 # ── Schemas ─────────────────────────────────────────────────────
 
@@ -374,12 +374,12 @@ def forgot_password_request(request: Request, data: ForgotPasswordRequest, sessi
     session.commit()
     session.refresh(reset_token)
 
-    email_sent = send_reset_email(user_email, reset_token.token, data.user_type)
+    email_result = send_reset_email(user_email, reset_token.token, data.user_type)
 
-    if email_sent:
+    if email_result["success"]:
         logger.info(f"Password reset email sent to {user_email} [{data.user_type}]")
         return {"message": "Password reset link sent to your email. It expires in 1 hour."}
-    else:
+    elif email_result["reason"] == "not_configured":
         # Dev/fallback mode: return token in response
         logger.warning(f"Email not sent (no Resend key). Returning token for {user_email}")
         return {
@@ -387,6 +387,13 @@ def forgot_password_request(request: Request, data: ForgotPasswordRequest, sessi
             "reset_token": reset_token.token,
             "expires_in": "1 hour"
         }
+    else:
+        # Resend threw an error (e.g., domain not verified, bad api key)
+        logger.error(f"Resend error: {email_result['reason']}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Email delivery failed. Resend Error: {email_result['reason']}"
+        )
 
 @router.post("/forgot-password/admin/request")
 @limiter.limit("5/minute")

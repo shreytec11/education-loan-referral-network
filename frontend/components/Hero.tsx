@@ -316,7 +316,8 @@ export default function Hero() {
                     color: var(--text-secondary);
                     line-height: 1.7;
                     max-width: 640px;
-                    margin-bottom: 2rem;
+                    margin: 0 auto 2rem auto;
+                    text-align: center;
                 }
 
                 .hero-actions {
