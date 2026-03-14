@@ -36,8 +36,8 @@ export default function AmbassadorRegister() {
                 throw new Error(data.detail || 'Registration failed');
             }
 
-            setSuccess('Registration successful! Redirecting to login...');
-            setTimeout(() => { router.push('/ambassador/login'); }, 2000);
+            setSuccess('Registration successful! Redirecting to home page...');
+            setTimeout(() => { router.push('/'); }, 2000);
         } catch (err: any) {
             setError(err.message);
         } finally {

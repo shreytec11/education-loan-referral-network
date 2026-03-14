@@ -65,9 +65,9 @@ export default function LeadForm() {
 
             setStatus("success");
 
-            // Redirect to student dashboard after a brief delay
+            // Redirect to home page after a brief delay
             setTimeout(() => {
-                router.push('/student/dashboard');
+                router.push('/');
             }, 1500);
         } catch (error: any) {
             console.error(error);
@@ -83,7 +83,7 @@ export default function LeadForm() {
                     <CheckCircle className="h-12 w-12" style={{ color: 'var(--success)' }} />
                 </div>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>Application Received!</h3>
-                <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)' }}>Thank you! Redirecting to your dashboard...</p>
+                <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)' }}>Thank you! Redirecting to the home page...</p>
                 <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
                     <div style={{ width: 24, height: 24, border: '3px solid rgba(16, 185, 129, 0.2)', borderTopColor: 'var(--success)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 </div>
