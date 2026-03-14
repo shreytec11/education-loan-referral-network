@@ -2,6 +2,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel, Relationship
+import secrets
 
 class Ambassador(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
@@ -79,3 +80,12 @@ class SystemSettings(SQLModel, table=True):
     company_revenue_rate: float = Field(default=0.7) # 0.7%
     ambassador_commission_rate: float = Field(default=0.3) # 0.3%
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PasswordResetToken(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: str  # Stored as string to support UUID from different tables
+    user_type: str  # 'admin', 'ambassador', 'student'
+    token: str = Field(default_factory=lambda: secrets.token_urlsafe(32), unique=True, index=True)
+    expires_at: datetime
+    used: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

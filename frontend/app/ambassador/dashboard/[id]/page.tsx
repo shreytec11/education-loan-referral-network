@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from 'react';
-import { Copy, Users, DollarSign, Activity, CheckCircle, TrendingUp, LayoutDashboard, Wallet, UsersRound, Trophy, Settings, Link2 } from 'lucide-react';
+import { Copy, Users, DollarSign, Activity, CheckCircle, TrendingUp, LayoutDashboard, Wallet, UsersRound, Trophy, Settings, Link2, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import NotificationCenter from '@/components/NotificationCenter';
@@ -53,6 +53,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     });
     const [saving, setSaving] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
+    const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwMessage, setPwMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -119,6 +122,32 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
             alert(err.message || 'Failed to submit payout request.');
         } finally {
             setWithdrawing(false);
+        }
+    };
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPwMessage(null);
+        if (pwForm.new_password !== pwForm.confirm_password) {
+            setPwMessage({ text: 'New passwords do not match.', ok: false });
+            return;
+        }
+        if (pwForm.new_password.length < 6) {
+            setPwMessage({ text: 'Password must be at least 6 characters.', ok: false });
+            return;
+        }
+        setPwLoading(true);
+        try {
+            await api.post('/api/auth/ambassador/change-password', {
+                current_password: pwForm.current_password,
+                new_password: pwForm.new_password,
+            });
+            setPwMessage({ text: '✓ Password changed successfully!', ok: true });
+            setPwForm({ current_password: '', new_password: '', confirm_password: '' });
+        } catch (err: any) {
+            setPwMessage({ text: err.message || 'Failed to change password.', ok: false });
+        } finally {
+            setPwLoading(false);
         }
     };
 
@@ -467,7 +496,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     {activeTab === 'Settings' && (
                         <div className="animate-fade-in">
                             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem' }}>Account Settings</h2>
-                            <div className="card">
+                            <div className="card" style={{ marginBottom: '1.5rem' }}>
                                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>Profile Information</h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                                     <div>
@@ -521,6 +550,41 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Session management</p>
                                     <button className="btn btn-ghost btn-sm" onClick={() => { window.location.href = '/ambassador/login'; }}>Log Out of All Devices</button>
+                                </div>
+                            </div>
+
+                            {/* Change Password Section */}
+                            <div className="card animate-slide-up" style={{ maxWidth: 480 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' }}>
+                                        <KeyRound size={20} />
+                                    </div>
+                                    <h3 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Change Password</h3>
+                                </div>
+                                <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    <div>
+                                        <label className="label">Current Password</label>
+                                        <input className="input" type="password" value={pwForm.current_password} onChange={e => setPwForm({ ...pwForm, current_password: e.target.value })} required placeholder="Enter current password" />
+                                    </div>
+                                    <div>
+                                        <label className="label">New Password</label>
+                                        <input className="input" type="password" value={pwForm.new_password} onChange={e => setPwForm({ ...pwForm, new_password: e.target.value })} required placeholder="Min. 6 characters" />
+                                    </div>
+                                    <div>
+                                        <label className="label">Confirm New Password</label>
+                                        <input className="input" type="password" value={pwForm.confirm_password} onChange={e => setPwForm({ ...pwForm, confirm_password: e.target.value })} required placeholder="Repeat new password" />
+                                    </div>
+                                    {pwMessage && (
+                                        <div style={{ padding: '0.6rem 0.85rem', borderRadius: 10, background: pwMessage.ok ? 'var(--success-soft)' : 'var(--danger-soft)', color: pwMessage.ok ? 'var(--success)' : 'var(--danger)', fontSize: '0.875rem' }}>
+                                            {pwMessage.text}
+                                        </div>
+                                    )}
+                                    <button type="submit" className="btn btn-primary" disabled={pwLoading} style={{ marginTop: '0.5rem' }}>
+                                        {pwLoading ? 'Updating...' : 'Update Password'}
+                                    </button>
+                                </form>
+                                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+                                    <Link href="/forgot-password?type=ambassador" style={{ fontSize: '0.85rem', color: 'var(--accent)' }}>Forgot your password?</Link>
                                 </div>
                             </div>
                         </div>

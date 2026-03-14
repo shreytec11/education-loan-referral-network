@@ -73,6 +73,9 @@ export default function StudentLogin() {
                             {loading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </form>
+                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+                        <Link href="/forgot-password?type=student" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>Forgot password?</Link>
+                    </div>
                 </div>
 
                 <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>

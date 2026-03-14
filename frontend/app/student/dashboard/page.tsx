@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, CheckCircle, Clock, AlertTriangle, XCircle, Banknote, LayoutDashboard, Wallet, FolderOpen, Settings } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Clock, AlertTriangle, XCircle, Banknote, LayoutDashboard, Wallet, FolderOpen, Settings, KeyRound } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import NotificationCenter from '@/components/NotificationCenter';
 import { api } from '@/lib/api';
+import Link from 'next/link';
 
 const STATUS_STEPS = [
     { id: 'Pending', label: 'Registered', sublabel: '' },
@@ -85,6 +86,9 @@ export default function StudentDashboard() {
     const [error, setError] = useState('');
     const [uploading, setUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('Dashboard');
+    const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwMessage, setPwMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
     useEffect(() => {
         const studentId = localStorage.getItem('studentId');
@@ -149,6 +153,32 @@ export default function StudentDashboard() {
         router.push('/student/login');
     };
 
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPwMessage(null);
+        if (pwForm.new_password !== pwForm.confirm_password) {
+            setPwMessage({ text: 'New passwords do not match.', ok: false });
+            return;
+        }
+        if (pwForm.new_password.length < 6) {
+            setPwMessage({ text: 'Password must be at least 6 characters.', ok: false });
+            return;
+        }
+        setPwLoading(true);
+        try {
+            await api.post('/api/auth/student/change-password', {
+                current_password: pwForm.current_password,
+                new_password: pwForm.new_password,
+            });
+            setPwMessage({ text: '✓ Password changed successfully!', ok: true });
+            setPwForm({ current_password: '', new_password: '', confirm_password: '' });
+        } catch (err: any) {
+            setPwMessage({ text: err.message || 'Failed to change password.', ok: false });
+        } finally {
+            setPwLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>
@@ -168,6 +198,7 @@ export default function StudentDashboard() {
         { icon: <LayoutDashboard size={18} />, label: 'Dashboard', active: activeTab === 'Dashboard', onClick: () => setActiveTab('Dashboard') },
         { icon: <Wallet size={18} />, label: 'Loans', active: activeTab === 'Loans', onClick: () => setActiveTab('Loans') },
         { icon: <FolderOpen size={18} />, label: 'Documents', active: activeTab === 'Documents', onClick: () => setActiveTab('Documents') },
+        { icon: <Settings size={18} />, label: 'Settings', active: activeTab === 'Settings', onClick: () => setActiveTab('Settings') },
     ];
 
     const getDocStatusBadge = (status?: string) => {
@@ -341,6 +372,49 @@ export default function StudentDashboard() {
                         </div>
                     )}
 
+                    {activeTab === 'Settings' && (
+                        <div className="animate-fade-in">
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Account Settings</h2>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Manage your login credentials.</p>
+
+                            <div className="card animate-slide-up" style={{ maxWidth: 480 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' }}>
+                                        <KeyRound size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Change Password</h3>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Default password is 123456</p>
+                                    </div>
+                                </div>
+                                <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    <div>
+                                        <label className="label">Current Password</label>
+                                        <input className="input" type="password" value={pwForm.current_password} onChange={e => setPwForm({ ...pwForm, current_password: e.target.value })} required placeholder="Enter current password" />
+                                    </div>
+                                    <div>
+                                        <label className="label">New Password</label>
+                                        <input className="input" type="password" value={pwForm.new_password} onChange={e => setPwForm({ ...pwForm, new_password: e.target.value })} required placeholder="Min. 6 characters" />
+                                    </div>
+                                    <div>
+                                        <label className="label">Confirm New Password</label>
+                                        <input className="input" type="password" value={pwForm.confirm_password} onChange={e => setPwForm({ ...pwForm, confirm_password: e.target.value })} required placeholder="Repeat new password" />
+                                    </div>
+                                    {pwMessage && (
+                                        <div style={{ padding: '0.6rem 0.85rem', borderRadius: 10, background: pwMessage.ok ? 'var(--success-soft)' : 'var(--danger-soft)', color: pwMessage.ok ? 'var(--success)' : 'var(--danger)', fontSize: '0.875rem' }}>
+                                            {pwMessage.text}
+                                        </div>
+                                    )}
+                                    <button type="submit" className="btn btn-primary" disabled={pwLoading} style={{ marginTop: '0.5rem' }}>
+                                        {pwLoading ? 'Updating...' : 'Update Password'}
+                                    </button>
+                                </form>
+                                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+                                    <Link href="/forgot-password?type=student" style={{ fontSize: '0.85rem', color: 'var(--accent)' }}>Forgot your password?</Link>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </main>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, FileText, CheckCircle, TrendingUp, LayoutDashboard, List, DollarSign, Settings, Search } from 'lucide-react';
+import { Users, FileText, CheckCircle, TrendingUp, LayoutDashboard, List, DollarSign, Settings, Search, KeyRound } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import NotificationCenter from '@/components/NotificationCenter';
 
@@ -104,6 +104,9 @@ export default function AdminDashboard() {
 
     const [settings, setSettings] = useState({ company_revenue_rate: 0.7, ambassador_commission_rate: 0.3 });
     const [updatingSettings, setUpdatingSettings] = useState(false);
+    const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwMessage, setPwMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
     const router = useRouter();
     useEffect(() => {
@@ -197,6 +200,38 @@ export default function AdminDashboard() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch { alert('Failed to export data'); }
+    };
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPwMessage(null);
+        if (pwForm.new_password !== pwForm.confirm_password) {
+            setPwMessage({ text: 'New passwords do not match.', ok: false });
+            return;
+        }
+        if (pwForm.new_password.length < 6) {
+            setPwMessage({ text: 'Password must be at least 6 characters.', ok: false });
+            return;
+        }
+        setPwLoading(true);
+        try {
+            const res = await fetch(`${apiBase}/api/auth/admin/change-password`, {
+                method: 'POST',
+                headers: getAdminHeaders(),
+                body: JSON.stringify({ current_password: pwForm.current_password, new_password: pwForm.new_password })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Failed' }));
+                throw new Error(err.detail || 'Failed to change password');
+            }
+            setPwMessage({ text: '✓ Password changed! You will be logged out.', ok: true });
+            setPwForm({ current_password: '', new_password: '', confirm_password: '' });
+            setTimeout(() => { localStorage.removeItem('adminToken'); router.push('/admin/login'); }, 2000);
+        } catch (err: any) {
+            setPwMessage({ text: err.message || 'Failed to change password.', ok: false });
+        } finally {
+            setPwLoading(false);
+        }
     };
 
     const filteredLeads = leads.filter(lead => {
@@ -756,6 +791,43 @@ export default function AdminDashboard() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Security / Change Password */}
+                            <div className="card">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' }}>
+                                        <KeyRound size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Security — Change Admin Password</h3>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>After changing, you will be logged out automatically.</p>
+                                    </div>
+                                </div>
+                                <form onSubmit={handleChangePassword} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem', maxWidth: 700 }}>
+                                    <div>
+                                        <label className="label">Current Password</label>
+                                        <input className="input" type="password" value={pwForm.current_password} onChange={e => setPwForm({ ...pwForm, current_password: e.target.value })} required placeholder="Enter current password" />
+                                    </div>
+                                    <div>
+                                        <label className="label">New Password</label>
+                                        <input className="input" type="password" value={pwForm.new_password} onChange={e => setPwForm({ ...pwForm, new_password: e.target.value })} required placeholder="Min. 6 characters" />
+                                    </div>
+                                    <div>
+                                        <label className="label">Confirm New Password</label>
+                                        <input className="input" type="password" value={pwForm.confirm_password} onChange={e => setPwForm({ ...pwForm, confirm_password: e.target.value })} required placeholder="Repeat new password" />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                        <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={pwLoading}>
+                                            {pwLoading ? 'Updating...' : 'Update Password'}
+                                        </button>
+                                    </div>
+                                </form>
+                                {pwMessage && (
+                                    <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: 10, background: pwMessage.ok ? 'var(--success-soft)' : 'var(--danger-soft)', color: pwMessage.ok ? 'var(--success)' : 'var(--danger)', fontSize: '0.875rem', maxWidth: 700 }}>
+                                        {pwMessage.text}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

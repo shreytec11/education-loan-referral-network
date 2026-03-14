@@ -71,6 +71,9 @@ export default function AmbassadorLogin() {
                             New to the program?{' '}
                             <Link href="/ambassador/register" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>Create an account →</Link>
                         </p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                            <Link href="/forgot-password?type=ambassador" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Forgot password?</Link>
+                        </p>
                     </div>
                 </div>
 
